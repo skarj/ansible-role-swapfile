@@ -1,0 +1,34 @@
+---
+
+- name: Create swap file {{ swap_file_size }} Mb
+  command: "fallocate -l {{ (swap_file_size | int)*1024*1024 }} {{ swap_file_path }}"
+  args:
+    creates: "{{ swap_file_path }}"
+
+- name: Change swap file permissions
+  file:
+    path: "{{ swap_file_path }}"
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Check swap file type
+  command: "file {{ swap_file_path }}"
+  changed_when: false
+  register: swapfile
+
+- name: Make swap file
+  command: "mkswap {{ swap_file_path }}"
+  when: swapfile.stdout.find('swap file') == -1
+
+- name: Write swap entry in fstab
+  mount:
+    name: none
+    src: "{{ swap_file_path }}"
+    fstype: swap
+    opts: sw
+    state: present
+
+- name: Enable swap
+  command: "swapon {{ swap_file_path }}"
+  when: ansible_swaptotal_mb < 1
